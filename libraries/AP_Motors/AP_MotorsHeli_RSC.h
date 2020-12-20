@@ -122,6 +122,12 @@ public:
 
     // output - update value to send to ESC/Servo
     void        output(RotorControlState state);
+	
+	// turbine start initialize sequence
+	void        set_turbine_start(bool turbine_start) {_turbine_start = (bool)turbine_start; }
+	
+	// turbine start initialize sequence
+	void        set_governor_on(bool gov) {_gov = (bool)gov; }
 
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
@@ -154,6 +160,9 @@ private:
     float           _governor_output;             // governor output for rotor speed control
     bool            _governor_engage;             // RSC governor status flag for soft-start
     bool            _use_bailout_ramp;            // true if allowing RSC to quickly ramp up engine
+	bool           _turbine_start;
+	bool           _starting;
+	bool           _gov;
 
     // update_rotor_ramp - slews rotor output scalar between 0 and 1, outputs float scalar to _rotor_ramp_output
     void            update_rotor_ramp(float rotor_ramp_input, float dt);

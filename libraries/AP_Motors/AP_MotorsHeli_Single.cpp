@@ -287,6 +287,18 @@ void AP_MotorsHeli_Single::calculate_armed_scalars()
     // set bailout ramp time
     _main_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
     _tail_rotor.use_bailout_ramp_time(_heliflags.enable_bailout);
+	
+	if (_heliflags.start_engine) {
+        _main_rotor.set_turbine_start(true);
+    } else {
+        _main_rotor.set_turbine_start(false);
+    }
+	
+	if (_heliflags.governor) {
+        _main_rotor.set_governor_on(true);
+    } else {
+        _main_rotor.set_governor_on(false);
+    }
 }
 
 // calculate_scalars - recalculates various scalers used.
@@ -324,6 +336,8 @@ void AP_MotorsHeli_Single::calculate_scalars()
         _tail_rotor.set_critical_speed(0);
         _tail_rotor.set_idle_output(0);
     }
+	
+	
 }
 
 // get_motor_mask - returns a bitmask of which outputs are being used for motors or servos (1 means being used)

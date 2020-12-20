@@ -61,7 +61,9 @@ public:
     //
     // heli specific methods
     //
-
+    void set_turb_start(bool turb_start) { _heliflags.start_engine = turb_start; }
+	
+	 void set_gov_on(bool gov_on) { _heliflags.governor = gov_on; }
     // parameter_check - returns true if helicopter specific parameters are sensible, used for pre-arm check
     virtual bool parameter_check(bool display_msg) const;
 
@@ -203,6 +205,8 @@ protected:
         uint8_t in_autorotation         : 1;    // true if aircraft is in autorotation
         uint8_t enable_bailout          : 1;    // true if allowing RSC to quickly ramp up engine
         uint8_t servo_test_running      : 1;    // true if servo_test is running
+		uint8_t start_engine                  : 1;
+		uint8_t governor                  : 1;
     } _heliflags;
 
     // parameters

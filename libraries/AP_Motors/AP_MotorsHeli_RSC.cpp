@@ -15,7 +15,7 @@
 
 #include <stdlib.h>
 #include <AP_HAL/AP_HAL.h>
-
+#include <GCS_MAVLink/GCS.h>
 #include "AP_MotorsHeli_RSC.h"
 
 extern const AP_HAL::HAL& hal;
@@ -220,6 +220,9 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
 
             // control output forced to zero
             _control_output = 0.0f;
+			
+			//turbine start flag on
+			_starting = true;
             break;
 
         case ROTOR_CONTROL_IDLE:
@@ -227,13 +230,23 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
             update_rotor_ramp(0.0f, dt);
 
             // set rotor control speed to idle speed parameter, this happens instantly and ignore ramping
-            _control_output = get_idle_output();
+             if (_turbine_start && _starting == true ) {			
+			_control_output += 0.001f;
+			
+			         if(_control_output >= 1.0f) {
+						_control_output = get_idle_output();
+						gcs().send_text(MAV_SEVERITY_INFO, "Turbine startup");
+				       _starting = false;
+				      }
+             } else{
+			 _control_output = get_idle_output();			 
+			 } 	 
             break;
 
         case ROTOR_CONTROL_ACTIVE:
             // set main rotor ramp to increase to full speed
             update_rotor_ramp(1.0f, dt);
-
+             _starting = false;
             if ((_control_mode == ROTOR_CONTROL_MODE_SPEED_PASSTHROUGH) || (_control_mode == ROTOR_CONTROL_MODE_SPEED_SETPOINT)) {
                 // set control rotor speed to ramp slewed value between idle and desired speed
                 _control_output = get_idle_output() + (_rotor_ramp_output * (_desired_speed - get_idle_output()));
@@ -246,33 +259,44 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
                 // or throttle curve if governor is out of range or sensor failed
             	float desired_throttle = calculate_desired_throttle(_collective_in);
             	// governor is active if within user-set range from reference speed
-                if ((_rotor_rpm >= ((float)_governor_reference - _governor_range)) && (_rotor_rpm <= ((float)_governor_reference + _governor_range))) {
-            	    float governor_droop = constrain_float((float)_governor_reference - _rotor_rpm,0.0f,_governor_range);
+                if ((_rotor_rpm >= ((float)_governor_reference - _governor_range)) && (_rotor_rpm <= ((float)_governor_reference + _governor_range))){
+            	    
+					float governor_droop = constrain_float((float)_governor_reference - _rotor_rpm,0.0f,_governor_range);
+					 
+                    if(_gov) {
             	    // if rpm has not reached 40% of the operational range from reference speed, governor
             	    // remains in pre-engage status, no reference speed compensation due to droop
             	    // this provides a soft-start function that engages the governor less aggressively
-            	    if (_governor_engage && _rotor_rpm < ((float)_governor_reference - (_governor_range * 0.4f))) {
+            	    if ( _rotor_rpm < ((float)_governor_reference - (_governor_range * 0.4f))) {
                         _governor_output = ((_rotor_rpm - (float)_governor_reference) * desired_throttle) * get_governor_droop_response() * -0.01f;
                     } else {
-            	        // normal flight status, governor fully engaged with reference speed compensation for droop
-            	        _governor_engage = true;
+            	        // normal flight status, governor fully engaged with reference speed compensation for droop            	        	
                         _governor_output = ((_rotor_rpm - ((float)_governor_reference + governor_droop)) * desired_throttle) * get_governor_droop_response() * -0.01f;
+						if(!_governor_engage){
+							_governor_engage = true;
+							gcs().send_text(MAV_SEVERITY_INFO, "Governor on");
+								}
                     }
-                    // check for governor disengage for return to flight idle power
-                    if (desired_throttle <= get_governor_disengage()) {
-                        _governor_output = 0.0f;
-                        _governor_engage = false;
-                    }
+						
+                       }else{
+						_governor_output = 0.0f;
+						if(_governor_engage){
+							_governor_engage = false;
+							gcs().send_text(MAV_SEVERITY_INFO, "Governor off");
+								}
+					}
                     // throttle output with governor on is constrained from minimum called for from throttle curve
                     // to maximum WOT. This prevents outliers on rpm signal from closing the throttle in flight due
                     // to rpm sensor failure or bad signal quality
-            	    _control_output = constrain_float(get_idle_output() + (_rotor_ramp_output * (((desired_throttle * get_governor_tcgain()) + _governor_output) - get_idle_output())), get_idle_output() + (_rotor_ramp_output * ((desired_throttle * get_governor_tcgain())) - get_idle_output()), 1.0f);
+            	    _control_output = constrain_float(get_idle_output() + (_rotor_ramp_output * (((desired_throttle* get_governor_tcgain()) + _governor_output) - get_idle_output())), get_idle_output() + (_rotor_ramp_output * ((calculate_desired_throttle(0.0f) )) - get_idle_output()), 1.0f);
             	} else {
             	    // hold governor output at zero, engage status is false and use the throttle curve
             	    // this is failover for in-flight failure of the speed sensor
-            	    _governor_output = 0.0f;
-            	    _governor_engage = false;
-                    _control_output = get_idle_output() + (_rotor_ramp_output * (desired_throttle - get_idle_output()));
+					if(_governor_engage){
+							_governor_engage = false;
+							gcs().send_text(MAV_SEVERITY_INFO, "Governor fault");
+						} 	
+            	    _control_output = get_idle_output() + (_rotor_ramp_output * (desired_throttle - get_idle_output()));
                 }
             }
             break;
