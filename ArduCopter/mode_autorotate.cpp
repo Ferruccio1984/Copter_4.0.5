@@ -231,8 +231,6 @@ void ModeAutorotate::run()
             float speed_forward = (groundspeed_vector.x*ahrs.cos_yaw() + groundspeed_vector.y*ahrs.sin_yaw())* 100; //(c/s)
             if(speed_forward >= g2.arot._param_flare_speed) {
 			_pitch_target = constrain_float( ((float)(speed_forward - g2.arot._param_flare_speed)/(float)(g2.arot._param_target_speed - g2.arot._param_flare_speed)*1500.0f),0.0f , 1500.0f );	
-			//_pitch_target = constrain_float( _pitch_target + (g2.arot._param_target_speed/g2.arot._param_flare_speed),0.0f , 1500.0f );
-         	//_pitch_target = linear_interpolate(0.0f , 10.0f ,inertial_nav.get_altitude() ,g.flare_alt ,g.touchdown_alt);
 			}else {
 			 _pitch_target = 0.0f;	
 			}
