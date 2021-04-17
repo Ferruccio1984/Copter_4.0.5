@@ -294,11 +294,6 @@ void AP_MotorsHeli_Single::calculate_armed_scalars()
         _main_rotor.set_turbine_start(false);
     }
 	
-	if (_heliflags.governor) {
-        _main_rotor.set_governor_on(true);
-    } else {
-        _main_rotor.set_governor_on(false);
-    }
 }
 
 // calculate_scalars - recalculates various scalers used.

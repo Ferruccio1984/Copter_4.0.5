@@ -121,6 +121,12 @@ void Copter::init_ardupilot()
     // sets up motors and output to escs
     init_rc_out();
 
+    // initialise airspeed sensor
+    airspeed.init();
+
+    // give AHRS the airspeed sensor
+    ahrs.set_airspeed(&airspeed);
+
     // check if we should enter esc calibration mode
     esc_calibration_startup_check();
 
@@ -196,6 +202,14 @@ void Copter::init_ardupilot()
     //-----------------------------
     barometer.set_log_baro_bit(MASK_LOG_IMU);
     barometer.calibrate();
+
+    if (airspeed.enabled()) {
+            // initialize airspeed sensor
+            // --------------------------
+            airspeed.calibrate(true);
+        } else {
+            gcs().send_text(MAV_SEVERITY_WARNING,"No airspeed");
+        }
 
     // initialise rangefinder
     init_rangefinder();

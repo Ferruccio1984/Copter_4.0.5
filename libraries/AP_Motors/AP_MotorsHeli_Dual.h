@@ -71,6 +71,10 @@ public:
     
     // get_governor_output
     float get_governor_output() const override { return _main_rotor.get_governor_output(); }
+	
+	float get_p() const override { return _main_rotor.get_p(); }
+	
+	float get_i() const override { return _main_rotor.get_i(); }
     
     // get_control_output
     float get_control_output() const override { return _main_rotor.get_control_output(); }

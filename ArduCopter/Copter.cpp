@@ -92,6 +92,8 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(rc_loop,              100,    130),
     SCHED_TASK(throttle_loop,         50,     75),
     SCHED_TASK(update_GPS,            50,    200),
+	SCHED_TASK(read_airspeed,          10,    100),
+	SCHED_TASK(airspeed_ratio_update,   1,    100),
 #if OPTFLOW == ENABLED
     SCHED_TASK_CLASS(OpticalFlow,          &copter.optflow,             update,         200, 160),
 #endif
@@ -290,6 +292,27 @@ void Copter::rc_loop()
     // -----------------------------------------
     read_radio();
     rc().read_mode_switch();
+}
+
+void Copter::airspeed_ratio_update(void)
+{
+    if (!airspeed.enabled() ||
+        gps.status() < AP_GPS::GPS_OK_FIX_3D ||
+        gps.ground_speed() < 4) {
+        // don't calibrate when not moving
+        return;
+    }
+    if (airspeed.get_airspeed() < g.airspeed_min &&
+        gps.ground_speed() < (uint32_t)g.airspeed_min) {
+        // don't calibrate when flying below the minimum airspeed. We
+        // check both airspeed and ground speed to catch cases where
+        // the airspeed ratio is way too low, which could lead to it
+        // never coming up again
+        return;
+    }
+
+    const Vector3f &vg = gps.velocity();
+    airspeed.update_calibration(vg, g.airspeed_max);
 }
 
 // throttle_loop - should be run at 50 hz

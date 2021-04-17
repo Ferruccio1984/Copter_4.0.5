@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_RPM/AP_RPM.h>
 #include "AP_MotorsHeli_RSC.h"
 
 extern const AP_HAL::HAL& hal;
@@ -134,14 +135,14 @@ const AP_Param::GroupInfo AP_MotorsHeli_RSC::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("GOV_SETPNT", 13, AP_MotorsHeli_RSC, _governor_reference, AP_MOTORS_HELI_RSC_GOVERNOR_SETPNT_DEFAULT),
 
-    // @Param: GOV_DISGAG
+     // @Param: GOV_DISGAG
     // @DisplayName: Governor Disengage Throttle
     // @Description: Percentage of throttle where the governor will disengage to allow return to flight idle power. Typically should be set to the same value as flight idle throttle (the very lowest throttle setting on the throttle curve). The governor disengage can be disabled by setting this value to zero and using the pull-down from the governor TCGAIN to reduce power to flight idle with the collective at it's lowest throttle setting on the throttle curve.
     // @Range: 0 50
     // @Units: %
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("GOV_DISGAG", 14, AP_MotorsHeli_RSC, _governor_disengage, AP_MOTORS_HELI_RSC_GOVERNOR_DISENGAGE_DEFAULT),
+    AP_GROUPINFO("GOV_I", 14, AP_MotorsHeli_RSC, _governor_int, AP_MOTORS_HELI_RSC_GOVERNOR_I_DEFAULT),
 
     // @Param: GOV_DROOP
     // @DisplayName: Governor Droop Response
@@ -169,6 +170,25 @@ const AP_Param::GroupInfo AP_MotorsHeli_RSC::var_info[] = {
     // @Increment: 10
     // @User: Standard
     AP_GROUPINFO("GOV_RANGE", 17, AP_MotorsHeli_RSC, _governor_range, AP_MOTORS_HELI_RSC_GOVERNOR_RANGE_DEFAULT),
+	
+	// @Param: GOV_RAMP
+    // @DisplayName: Governor ramp
+    // @Description: parameter for smooth ramp up of throttle output before governor takes over
+    // @Range: 0 0.5
+    // @Units: %
+    // @Increment: 0.01
+    // @User: Standard
+    AP_GROUPINFO("GOV_RAMP", 18, AP_MotorsHeli_RSC, _gov_ramp, AP_MOTORS_HELI_RSC_GOVERNOR_RAMP),
+	
+	// @Param: GOV_DDBND
+    // @DisplayName: Governor Deadband
+    // @Description:
+    // @Range: 0 50
+    // @Units: %
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("GOV_DDBND", 19, AP_MotorsHeli_RSC, _dead_band, AP_MOTORS_HELI_RSC_GOVERNOR_DDBD),
+
 
     AP_GROUPEND
 };
@@ -201,6 +221,9 @@ void AP_MotorsHeli_RSC::set_throttle_curve()
 // output - update value to send to ESC/Servo
 void AP_MotorsHeli_RSC::output(RotorControlState state)
 {
+	const AP_RPM *rpm = AP_RPM::get_singleton();
+    _rrpm = rpm->get_rpm(0);
+	
     float dt;
     uint64_t now = AP_HAL::micros64();
     float last_control_output = _control_output;
@@ -221,6 +244,10 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
             // control output forced to zero
             _control_output = 0.0f;
 			
+			 //reset givernor 
+		  _governor_engage = false;
+		   _flight_idle_min = 0.0f;
+			
 			//turbine start flag on
 			_starting = true;
             break;
@@ -228,7 +255,8 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
         case ROTOR_CONTROL_IDLE:
             // set rotor ramp to decrease speed to zero
             update_rotor_ramp(0.0f, dt);
-
+           //reset givernor 
+		   reset_governor();
             // set rotor control speed to idle speed parameter, this happens instantly and ignore ramping
              if (_turbine_start && _starting == true ) {			
 			_control_output += 0.001f;
@@ -259,37 +287,41 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
                 // or throttle curve if governor is out of range or sensor failed
             	float desired_throttle = calculate_desired_throttle(_collective_in);
             	// governor is active if within user-set range from reference speed
-                if ((_rotor_rpm >= ((float)_governor_reference - _governor_range)) && (_rotor_rpm <= ((float)_governor_reference + _governor_range))){
-            	    
-					float governor_droop = constrain_float((float)_governor_reference - _rotor_rpm,0.0f,_governor_range);
-					 
-                    if(_gov) {
-            	    // if rpm has not reached 40% of the operational range from reference speed, governor
-            	    // remains in pre-engage status, no reference speed compensation due to droop
-            	    // this provides a soft-start function that engages the governor less aggressively
-            	    if ( _rotor_rpm < ((float)_governor_reference - (_governor_range * 0.4f))) {
-                        _governor_output = ((_rotor_rpm - (float)_governor_reference) * desired_throttle) * get_governor_droop_response() * -0.01f;
-                    } else {
-            	        // normal flight status, governor fully engaged with reference speed compensation for droop            	        	
-                        _governor_output = ((_rotor_rpm - ((float)_governor_reference + governor_droop)) * desired_throttle) * get_governor_droop_response() * -0.01f;
-						if(!_governor_engage){
+                if (_governor_engage && (_rrpm >= ((float)_governor_reference - _governor_range)) && (_rrpm <= ((float)_governor_reference + _governor_range))){
+            	   
+				       _error = ((float)_governor_reference) - _rrpm;
+					   //compute long-term governor response
+					  
+					         if (_rrpm < (((float)_governor_reference) - _dead_band)) {
+                                  _i_term += get_governor_int() * 0.0001f;
+                                  if(_i_term > (1.0f - _flight_idle_min))	{
+                                     _i_term = (1.0f - _flight_idle_min);
+                                      }  									  
+                                    } else if (_rrpm > (((float)_governor_reference) + _dead_band)) {
+                                  _i_term -= get_governor_int()  * 0.0001f;
+								  if(_i_term < -0.1f)	{
+                                     _i_term = -0.1f;
+                                      }  	
+                                }						   
+						
+                				
+				     //instantaneous governor response				 				 
+					 _p_term = _error * get_governor_droop_response() * 0.001f;
+					
+					//governor output compute	   
+					      _governor_output =_p_term + ((desired_throttle - (_i_term + _flight_idle_min)) * get_governor_tcgain()) +_i_term + _flight_idle_min;
+                                  
+				   //control output compute 
+            	    _control_output = constrain_float(get_idle_output() + (_rotor_ramp_output * ( _governor_output - get_idle_output())), get_idle_output() , 1.0f);
+				} else if ( !_governor_engage && (_rrpm >= (((float)_governor_reference) /2.0f))) {
+				_governor_output += (_gov_ramp * 0.0001f);
+				_control_output = get_idle_output() + (_rotor_ramp_output * (desired_throttle - get_idle_output()) + _governor_output);
+				if( _rrpm > ((float)_governor_reference)){
 							_governor_engage = true;
 							gcs().send_text(MAV_SEVERITY_INFO, "Governor on");
-								}
-                    }
-						
-                       }else{
-						_governor_output = 0.0f;
-						if(_governor_engage){
-							_governor_engage = false;
-							gcs().send_text(MAV_SEVERITY_INFO, "Governor off");
-								}
-					}
-                    // throttle output with governor on is constrained from minimum called for from throttle curve
-                    // to maximum WOT. This prevents outliers on rpm signal from closing the throttle in flight due
-                    // to rpm sensor failure or bad signal quality
-            	    _control_output = constrain_float(get_idle_output() + (_rotor_ramp_output * (((desired_throttle* get_governor_tcgain()) + _governor_output) - get_idle_output())), get_idle_output() + (_rotor_ramp_output * ((calculate_desired_throttle(0.0f) )) - get_idle_output()), 1.0f);
-            	} else {
+							_flight_idle_min = _control_output;
+							}     
+                      }  else {
             	    // hold governor output at zero, engage status is false and use the throttle curve
             	    // this is failover for in-flight failure of the speed sensor
 					if(_governor_engage){
@@ -315,6 +347,14 @@ void AP_MotorsHeli_RSC::output(RotorControlState state)
     write_rsc(_control_output);
 }
 
+void AP_MotorsHeli_RSC::reset_governor()
+{
+	_i_term = 0.0f;
+	_p_term= 0.0f;
+	_error = 0.0f;
+	_governor_output = 0.0f;
+	
+}	
 // update_rotor_ramp - slews rotor output scalar between 0 and 1, outputs float scalar to _rotor_ramp_output
 void AP_MotorsHeli_RSC::update_rotor_ramp(float rotor_ramp_input, float dt)
 {

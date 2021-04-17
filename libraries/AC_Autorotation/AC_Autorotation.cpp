@@ -17,6 +17,10 @@
 #define FWD_SPD_CONTROLLER_MAX_ACCEL                  60      // Default acceleration limit for speed height controller (unit: cm/s/s)
 #define AP_FW_VEL_P                       0.9f
 #define AP_FW_VEL_FF                      0.15f
+#define AP_FLARE_SPD                      100
+#define AP_FLARE_ALT                      2000
+#define AP_TCHDWN_ALT                     300
+#define AP_SINK_RATE                         200
 
 
 const AP_Param::GroupInfo AC_Autorotation::var_info[] = {
@@ -114,6 +118,38 @@ const AP_Param::GroupInfo AC_Autorotation::var_info[] = {
     // @Increment: 0.01
     // @User: Advanced
     AP_GROUPINFO("FW_V_FF", 11, AC_Autorotation, _param_fwd_k_ff, AP_FW_VEL_FF),
+	
+	// @Param: FLARE_SPEED
+    // @DisplayName: Velocity for flare
+    // @Description: velocity for flare phase 
+    // @Range: 0 6
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_SPD", 12, AC_Autorotation, _param_flare_speed, AP_FLARE_SPD),
+	
+	// @Param: FLARE_ALT
+    // @DisplayName: flare altitude
+    // @Description: altitude at which flare begins
+    // @Range: 0 3000
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_ALT", 13, AC_Autorotation, _param_flr_alt, AP_FLARE_ALT),
+	
+	// @Param: TCHDWN_ALT
+    // @DisplayName: touchdown altitude
+    // @Description: altitude at which cushion action should begin
+    // @Range: 0 200
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("TCHDWN_ALT", 14, AC_Autorotation, _param_tchdwn_alt, AP_TCHDWN_ALT),
+	
+	// @Param: SINK_RATE
+    // @DisplayName: touchdown altitude
+    // @Description: altitude at which cushion action should begin
+    // @Range: 0 200
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("SINK_RATE", 15, AC_Autorotation, _param_sink_rate, AP_SINK_RATE),
 
     AP_GROUPEND
 };
@@ -268,7 +304,7 @@ void AC_Autorotation::Log_Write_Autorotation(void)
                         (double)_vel_ff,
                         (double)_accel_out,
                         (double)_accel_target,
-                        (double)_pitch_target);
+                        (double)trim_speed);						
 }
 
 
@@ -277,6 +313,8 @@ void AC_Autorotation::init_fwd_spd_controller(void)
 {
     // Reset I term and acceleration target
     _accel_target = 0.0f;
+	trim_speed = 0.0f;
+	last_trim_speed = 0.0f;
     
     // Ensure parameter acceleration doesn't exceed hard-coded limit
     _accel_max = MIN(_param_accel_max, 60.0f);
@@ -302,17 +340,36 @@ void AC_Autorotation::update_forward_speed_controller(void)
 
     _delta_speed_fwd = _speed_forward - _speed_forward_last; //(cm/s)
     _speed_forward_last = _speed_forward; //(cm/s)
-
+    
+	//average rpm
+	if (counter < 20){
+    _current_rpm = get_rpm(true);
+	sum_rpm += _current_rpm;
+	counter ++;
+	}else{
+	average_rpm = sum_rpm/20;
+    counter=0;	
+	sum_rpm=0.0f;
+	}
+	if (average_rpm < (_param_head_speed_set_point -5.0f)){
+	trim_speed --;	
+	last_trim_speed = trim_speed;
+	}else if (average_rpm > (_param_head_speed_set_point +5.0f)){	
+	trim_speed ++;
+	last_trim_speed = trim_speed;
+	}else{
+	trim_speed = last_trim_speed;
+	}
     // Limitng the target velocity based on the max acceleration limit
-    if (_cmd_vel < _vel_target) {
+    if (_cmd_vel < (_vel_target+trim_speed)) {
         _cmd_vel += _accel_max * _dt;
-        if (_cmd_vel > _vel_target) {
-            _cmd_vel = _vel_target;
+        if (_cmd_vel > (_vel_target+trim_speed)) {
+            _cmd_vel = (_vel_target+trim_speed);
         }
     } else {
         _cmd_vel -= _accel_max * _dt;
-        if (_cmd_vel < _vel_target) {
-            _cmd_vel = _vel_target;
+        if (_cmd_vel < (_vel_target+trim_speed)) {
+            _cmd_vel = (_vel_target+trim_speed);
         }
     }
 

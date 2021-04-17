@@ -26,6 +26,7 @@ struct PACKED log_Control_Tuning {
 // Write a control tuning packet
 void Copter::Log_Write_Control_Tuning()
 {
+	
     // get terrain altitude
     float terr_alt = 0.0f;
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
@@ -61,7 +62,8 @@ void Copter::Log_Write_Control_Tuning()
         terr_alt            : terr_alt,
         target_climb_rate   : target_climb_rate_cms,
         climb_rate          : int16_t(inertial_nav.get_velocity_z()), // float -> int16_t
-        dynamic_notch_freq  : ins.get_gyro_dynamic_notch_center_freq_hz()
+        dynamic_notch_freq  : ins.get_gyro_dynamic_notch_center_freq_hz(),
+		
     };
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -352,12 +354,16 @@ struct PACKED log_Heli {
     float    main_rotor_speed;
     float    governor_output;
     float    control_output;
+	float    airspeed_estimate;
 };
 
 #if FRAME_CONFIG == HELI_FRAME
 // Write an helicopter packet
 void Copter::Log_Write_Heli()
 {
+	float est_airspeed = 0;
+	ahrs.airspeed_estimate(&est_airspeed);
+	
     struct log_Heli pkt_heli = {
         LOG_PACKET_HEADER_INIT(LOG_HELI_MSG),
         time_us                 : AP_HAL::micros64(),
@@ -365,6 +371,7 @@ void Copter::Log_Write_Heli()
         main_rotor_speed        : motors->get_main_rotor_speed(),
         governor_output         : motors->get_governor_output(),
         control_output          : motors->get_control_output(),
+		airspeed_estimate   : est_airspeed
     };
     logger.WriteBlock(&pkt_heli, sizeof(pkt_heli));
 }
@@ -477,7 +484,7 @@ const struct LogStructure Copter::log_structure[] = {
       "DFLT",  "QBf",         "TimeUS,Id,Value", "s--", "F--" },
 #if FRAME_CONFIG == HELI_FRAME
     { LOG_HELI_MSG, sizeof(log_Heli),
-      "HELI",  "Qffff",        "TimeUS,DRRPM,ERRPM,Gov,Throt", "s----", "F----" },
+      "HELI",  "Qfffff",        "TimeUS,DRRPM,ERRPM,Gov,Throt,S", "s----n", "F----0" },
 #endif
 #if PRECISION_LANDING == ENABLED
     { LOG_PRECLAND_MSG, sizeof(log_Precland),

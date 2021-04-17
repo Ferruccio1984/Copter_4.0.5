@@ -176,7 +176,6 @@ public:
         STANDBY  =            76, // Standby mode
         TAKEOFF   =           77, // takeoff
 		TURB_START =         78, // initialize turbine start sequence
-		GOVERNOR=             79, //enables rotor speed governor
 		KILL_IMU1 =          100, // disable first IMU (for IMU failure testing)
         KILL_IMU2 =          101, // disable second IMU (for IMU failure testing)
         CAM_MODE_TOGGLE =    102, // Momentary switch to cycle camera modes

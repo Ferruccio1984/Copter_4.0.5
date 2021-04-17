@@ -267,6 +267,8 @@ private:
 
     AP_Logger logger;
 
+    AP_Airspeed airspeed;
+
     // flight modes convenience array
     AP_Int8 *flight_modes;
     const uint8_t num_flight_modes = 6;
@@ -437,6 +439,8 @@ private:
 
     int32_t _home_bearing;
     uint32_t _home_distance;
+
+    float smoothed_airspeed;
 
     // SIMPLE Mode
     // Used to track the orientation of the vehicle for Simple mode. This value is reset at each arming
@@ -869,6 +873,8 @@ private:
     void init_visual_odom();
     void winch_init();
     void winch_update();
+    void read_airspeed();
+    void airspeed_ratio_update();
 
     // setup.cpp
     void report_compass();

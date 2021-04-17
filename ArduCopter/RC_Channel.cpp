@@ -74,7 +74,6 @@ void RC_Channel_Copter::init_aux_function(const aux_func_t ch_option, const aux_
     case AUX_FUNC::ATTCON_ACCEL_LIM:
     case AUX_FUNC::MOTOR_INTERLOCK:
 	case AUX_FUNC::TURB_START:
-	case AUX_FUNC::GOVERNOR:
     case AUX_FUNC::AVOID_ADSB:
     case AUX_FUNC::PRECISION_LOITER:
     case AUX_FUNC::INVERTED:
@@ -381,25 +380,7 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
             }		
 #endif
          break;
-		 
-		         case AUX_FUNC::GOVERNOR:
-#if FRAME_CONFIG == HELI_FRAME
-            
-           switch (ch_flag) {
-                case HIGH:
-                    copter.motors->set_gov_on(true);
-                    					
-                    break;
-                case MIDDLE:
-                    // nothing
-                    break;
-                case LOW:
-                    copter.motors->set_gov_on(false);	
-                    					
-                    break;
-            }		
-#endif
-         break;
+		
 		 
         case AUX_FUNC::BRAKE:
 #if MODE_BRAKE_ENABLED == ENABLED

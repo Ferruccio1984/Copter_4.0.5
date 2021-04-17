@@ -120,6 +120,17 @@ bool Copter::rangefinder_up_ok()
     return (rangefinder_up_state.enabled && rangefinder_up_state.alt_healthy);
 }
 
+void Copter::read_airspeed(void)
+{
+    airspeed.update(should_log(MASK_LOG_IMU));
+
+    // update smoothed airspeed estimate
+    float aspeed;
+    if (ahrs.airspeed_estimate(&aspeed)) {
+        smoothed_airspeed = smoothed_airspeed * 0.8f + aspeed * 0.2f;
+    }
+}
+
 /*
   update RPM sensors
  */

@@ -375,7 +375,7 @@
 
 //////////////////////////////////////////////////////////////////////////////
 // Autorotate - autonomous auto-rotation - helicopters only
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+
     #if FRAME_CONFIG == HELI_FRAME
         #ifndef MODE_AUTOROTATE_ENABLED
         # define MODE_AUTOROTATE_ENABLED !HAL_MINIMIZE_FEATURES
@@ -383,9 +383,8 @@
     #else
         # define MODE_AUTOROTATE_ENABLED DISABLED
     #endif
-#else
-    # define MODE_AUTOROTATE_ENABLED DISABLED
-#endif
+
+
 //////////////////////////////////////////////////////////////////////////////
 
 // Beacon support - support for local positioning systems
@@ -562,6 +561,14 @@
 
 #ifndef RTL_LOITER_TIME
  # define RTL_LOITER_TIME           5000    // Time (in milliseconds) to loiter above home before beginning final descent
+#endif
+
+#ifndef AIRSPEED_FBW_MAX
+ # define AIRSPEED_FBW_MAX           35.0f    // Time (in milliseconds) to loiter above home before beginning final descent
+#endif
+
+#ifndef AIRSPEED_FBW_MIN
+ # define AIRSPEED_FBW_MIN           5.0f    // Time (in milliseconds) to loiter above home before beginning final descent
 #endif
 
 // AUTO Mode

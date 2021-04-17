@@ -104,6 +104,24 @@ const AP_Param::Info Copter::var_info[] = {
     // @Bitmask: 0:Roll,1:Pitch,2:Yaw,3:AccelZ
     GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
 
+	 // @Param: ARSPD_FBW_MAX
+	 // @DisplayName: Maximum Airspeed
+	 // @Description: Maximum airspeed demanded in automatic throttle modes. Should be set slightly less than level flight speed at THR_MAX and also at least 50% above ARSPD_FBW_MAX to allow for accurate TECS altitude control.
+	 // @Units: m/s
+	 // @Range: 5 100
+	 // @Increment: 1
+	 // @User: Standard
+	 GSCALAR(airspeed_max, "ARSPD_FBW_MAX",  AIRSPEED_FBW_MAX),
+
+	 // @Param: ARSPD_FBW_MAX
+	 // @DisplayName: Maximum Airspeed
+	 // @Description: Maximum airspeed demanded in automatic throttle modes. Should be set slightly less than level flight speed at THR_MAX and also at least 50% above ARSPD_FBW_MAX to allow for accurate TECS altitude control.
+	 // @Units: m/s
+	 // @Range: 5 100
+	 // @Increment: 1
+	 // @User: Standard
+	 GSCALAR(airspeed_min, "ARSPD_FBW_MIN",  AIRSPEED_FBW_MIN),
+
 #if MODE_RTL_ENABLED == ENABLED
     // @Param: RTL_ALT
     // @DisplayName: RTL Altitude
@@ -622,6 +640,10 @@ const AP_Param::Info Copter::var_info[] = {
     // @Path: ../libraries/AP_Motors/AP_MotorsMulticopter.cpp
     GOBJECTVARPTR(motors, "MOT_",      &copter.motors_var_info),
 #endif
+
+	// @Group: ARSPD
+	// @Path: ../libraries/AP_Airspeed/AP_Airspeed.cpp
+	GOBJECT(airspeed,                               "ARSPD",   AP_Airspeed),
 
     // @Group: RCMAP_
     // @Path: ../libraries/AP_RCMapper/AP_RCMapper.cpp

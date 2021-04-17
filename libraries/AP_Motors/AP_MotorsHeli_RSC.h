@@ -28,10 +28,12 @@
 
 // RSC governor defaults
 #define AP_MOTORS_HELI_RSC_GOVERNOR_SETPNT_DEFAULT    1500
-#define AP_MOTORS_HELI_RSC_GOVERNOR_DISENGAGE_DEFAULT 25
+#define AP_MOTORS_HELI_RSC_GOVERNOR_I_DEFAULT            25
 #define AP_MOTORS_HELI_RSC_GOVERNOR_DROOP_DEFAULT     30
 #define AP_MOTORS_HELI_RSC_GOVERNOR_TCGAIN_DEFAULT    90
 #define AP_MOTORS_HELI_RSC_GOVERNOR_RANGE_DEFAULT     100
+#define AP_MOTORS_HELI_RSC_GOVERNOR_RAMP                    0.05
+#define AP_MOTORS_HELI_RSC_GOVERNOR_DDBD                   2.0
 
 // rotor controller states
 enum RotorControlState {
@@ -101,6 +103,10 @@ public:
     
     // get_governor_output
     float       get_governor_output() const { return _governor_output; }
+	
+	float       get_p() const   { return _p_term; }
+	
+	float       get_i() const   { return _i_term; }
 
     // is_runup_complete
     bool        is_runup_complete() const { return _runup_complete; }
@@ -126,8 +132,7 @@ public:
 	// turbine start initialize sequence
 	void        set_turbine_start(bool turbine_start) {_turbine_start = (bool)turbine_start; }
 	
-	// turbine start initialize sequence
-	void        set_governor_on(bool gov) {_gov = (bool)gov; }
+	void        reset_governor() ;
 
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo var_info[];
@@ -162,7 +167,13 @@ private:
     bool            _use_bailout_ramp;            // true if allowing RSC to quickly ramp up engine
 	bool           _turbine_start;
 	bool           _starting;
-	bool           _gov;
+	float           _rrpm; 
+	float           _error;
+	float           _i_term;
+	float           _p_term;
+	float           _flight_idle_min;
+	
+	
 
     // update_rotor_ramp - slews rotor output scalar between 0 and 1, outputs float scalar to _rotor_ramp_output
     void            update_rotor_ramp(float rotor_ramp_input, float dt);
@@ -181,14 +192,17 @@ private:
     AP_Int16        _thrcrv[5];               // throttle value sent to throttle servo at 0, 25, 50, 75 and 100 percent collective
     AP_Int16        _governor_reference;      // sets rotor speed for governor
     AP_Float        _governor_range;          // RPM range +/- governor rpm reference setting where governor is operational
-    AP_Float        _governor_disengage;      // sets the throttle percent where the governor disengages for return to flight idle
+    AP_Float        _governor_int;     // sets the throttle percent where the governor disengages for return to flight idle
     AP_Float        _governor_droop_response; // governor response to droop under load
     AP_Float        _governor_tcgain;       // governor throttle curve weighting, range 50-100%
+	AP_Float        _gov_ramp;
+	AP_Float        _dead_band;
+	
 
     // parameter accessors to allow conversions
     float       get_critical_speed() const { return _critical_speed * 0.01; }
     float       get_idle_output() { return _idle_output * 0.01; }
-    float       get_governor_disengage() { return _governor_disengage * 0.01; }
+    float       get_governor_int() { return _governor_int * 0.01; }
     float       get_governor_droop_response() { return _governor_droop_response * 0.01; }
     float       get_governor_tcgain() { return _governor_tcgain * 0.01; }
 

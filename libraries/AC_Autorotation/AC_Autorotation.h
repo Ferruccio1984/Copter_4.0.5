@@ -38,12 +38,19 @@ public:
     void update_forward_speed_controller(void);  // Update foward speed controller
     void set_desired_fwd_speed(void) { _vel_target = _param_target_speed; } // Overloaded: Set desired speed for forward controller to parameter value
     void set_desired_fwd_speed(float speed) { _vel_target = speed; } // Overloaded: Set desired speed to argument value
+	void set_flare_speed(void) { _vel_target = _param_flare_speed; }
+	void set_flare_speed(float speed) { _vel_target = _param_flare_speed; }
     int32_t get_pitch(void) const { return _pitch_target; }  // Get pitch target
     float calc_speed_forward(void);  // Calculates the forward speed in the horizontal plane
     void set_dt(float delta_sec);
 
     // User Settable Parameters
     static const struct AP_Param::GroupInfo var_info[];
+	AP_Int16 _param_flare_speed;
+	AP_Int16 _param_target_speed;
+	AP_Float _param_flr_alt;
+	AP_Float _param_tchdwn_alt;
+	AP_Float _param_sink_rate;
 
 private:
 
@@ -74,6 +81,11 @@ private:
     float _vel_p;                    // Forward velocity P term.
     float _vel_ff;                   // Forward velocity Feed Forward term.
     float _accel_out;                // Acceleration value used to calculate pitch target.
+	int    counter;
+	float sum_rpm;
+	float average_rpm;
+	float trim_speed;
+	float last_trim_speed;
 
     LowPassFilterFloat _accel_target_filter; // acceleration target filter
 
@@ -82,13 +94,13 @@ private:
     AC_P _p_hs;
     AC_P _p_fw_vel;
     AP_Int16 _param_head_speed_set_point;
-    AP_Int16 _param_target_speed;
     AP_Float _param_col_entry_cutoff_freq;
     AP_Float _param_col_glide_cutoff_freq;
     AP_Int16 _param_accel_max;
     AP_Float _param_bail_time;
     AP_Int8  _param_rpm_instance;
     AP_Float _param_fwd_k_ff;
+	
 
     //--------Internal Flags--------
     struct controller_flags {

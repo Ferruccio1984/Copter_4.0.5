@@ -201,6 +201,9 @@ public:
         k_param_pos_control,
         k_param_circle_nav,
         k_param_loiter_nav,     // 105
+		k_param_airspeed,
+		k_param_airspeed_max,
+		k_param_airspeed_min,
 
         // 110: Telemetry control
         //
@@ -392,6 +395,13 @@ public:
     AP_Int16        rtl_altitude;
     AP_Int16        rtl_speed_cms;
     AP_Float        rtl_cone_slope;
+    AP_Int16        airspeed_min;
+    AP_Int16        airspeed_max;
+	AP_Int16        flare_alt;
+	AP_Int16        touchdown_alt;
+	AP_Float        sink_rate;
+	
+
 #if RANGEFINDER_ENABLED == ENABLED
     AP_Float        rangefinder_gain;
 #endif
@@ -446,6 +456,8 @@ public:
     AP_Int8         fs_crash_check;
     AP_Float        fs_ekf_thresh;
     AP_Int16        gcs_pid_mask;
+
+
 
 #if MODE_THROW_ENABLED == ENABLED
     AP_Int8         throw_motor_start;
