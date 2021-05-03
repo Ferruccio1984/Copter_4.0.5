@@ -13,14 +13,14 @@
 #define HS_CONTROLLER_GLIDE_COL_FILTER                0.1f    // Default low pass filter frequency during the glide phase (unit: Hz)
 
 // Speed Height controller specific default definitions for autorotation use
-#define FWD_SPD_CONTROLLER_GND_SPEED_TARGET           1100     // Default target ground speed for speed height controller (unit: cm/s)
+#define FWD_SPD_CONTROLLER_GND_SPEED_TARGET           900     // Default target ground speed for speed height controller (unit: cm/s)
 #define FWD_SPD_CONTROLLER_MAX_ACCEL                  60      // Default acceleration limit for speed height controller (unit: cm/s/s)
 #define AP_FW_VEL_P                       0.9f
 #define AP_FW_VEL_FF                      0.15f
 #define AP_FLARE_SPD                      100
 #define AP_FLARE_ALT                      2000
-#define AP_TCHDWN_ALT                     300
-#define AP_SINK_RATE                         200
+#define AP_TCHDWN_ALT                     250
+
 
 
 const AP_Param::GroupInfo AC_Autorotation::var_info[] = {
@@ -142,14 +142,7 @@ const AP_Param::GroupInfo AC_Autorotation::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("TCHDWN_ALT", 14, AC_Autorotation, _param_tchdwn_alt, AP_TCHDWN_ALT),
-	
-	// @Param: SINK_RATE
-    // @DisplayName: touchdown altitude
-    // @Description: altitude at which cushion action should begin
-    // @Range: 0 200
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("SINK_RATE", 15, AC_Autorotation, _param_sink_rate, AP_SINK_RATE),
+
 
     AP_GROUPEND
 };
@@ -162,6 +155,21 @@ AC_Autorotation::AC_Autorotation(AP_InertialNav& inav) :
     {
         AP_Param::setup_object_defaults(this, var_info);
     }
+	
+float AC_Autorotation::calculate_average_rpm()
+{
+	if (counter < 5.0f){
+    _current_rpm = get_rpm(true);
+	sum_rpm += _current_rpm;
+	counter ++;
+	}else{
+	average_rpm = sum_rpm/5.0f;
+    counter=0;	
+	sum_rpm=0.0f;
+	}
+    
+	return average_rpm;
+}
 
 // Initialisation of head speed controller
 void AC_Autorotation::init_hs_controller()
@@ -182,7 +190,6 @@ void AC_Autorotation::init_hs_controller()
     // Protect against divide by zero
     _param_head_speed_set_point = MAX(_param_head_speed_set_point,500);
 }
-
 
 bool AC_Autorotation::update_hs_glide_controller(float dt)
 {
@@ -256,7 +263,7 @@ float AC_Autorotation::get_rpm(bool update_counter)
         //Get RPM value
         uint8_t instance = _param_rpm_instance;
         current_rpm = rpm->get_rpm(instance);
-
+       
         //Check RPM sesnor is returning a healthy status
         if (current_rpm <= -1) {
             //unhealthy, rpm unreliable
@@ -304,7 +311,7 @@ void AC_Autorotation::Log_Write_Autorotation(void)
                         (double)_vel_ff,
                         (double)_accel_out,
                         (double)_accel_target,
-                        (double)trim_speed);						
+                        (double)_pitch_target);						
 }
 
 
@@ -340,23 +347,13 @@ void AC_Autorotation::update_forward_speed_controller(void)
 
     _delta_speed_fwd = _speed_forward - _speed_forward_last; //(cm/s)
     _speed_forward_last = _speed_forward; //(cm/s)
-    
-	//average rpm
-	if (counter < 20){
-    _current_rpm = get_rpm(true);
-	sum_rpm += _current_rpm;
-	counter ++;
-	}else{
-	average_rpm = sum_rpm/20;
-    counter=0;	
-	sum_rpm=0.0f;
-	}
-	if (average_rpm < (_param_head_speed_set_point -5.0f)){
+	
+	if (calculate_average_rpm() < (_param_head_speed_set_point -5.0f)){
 	trim_speed --;	
-	last_trim_speed = trim_speed;
-	}else if (average_rpm > (_param_head_speed_set_point +5.0f)){	
+	last_trim_speed = trim_speed/10.0f;
+	}else if (calculate_average_rpm() > (_param_head_speed_set_point +5.0f)){	
 	trim_speed ++;
-	last_trim_speed = trim_speed;
+	last_trim_speed = trim_speed/10.0f;
 	}else{
 	trim_speed = last_trim_speed;
 	}
@@ -421,4 +418,7 @@ float AC_Autorotation::calc_speed_forward(void)
     float speed_forward = (groundspeed_vector.x*ahrs.cos_yaw() + groundspeed_vector.y*ahrs.sin_yaw())* 100; //(c/s)
     return speed_forward;
 }
+
+
+
 

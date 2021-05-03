@@ -22,6 +22,7 @@ public:
 
     //--------Functions--------
     void init_hs_controller(void);  // Initialise head speed controller
+	float calculate_average_rpm();
     void init_fwd_spd_controller(void);  // Initialise forward speed controller
     bool update_hs_glide_controller(float dt);  // Update head speed controller
     float get_rpm(void) const { return _current_rpm; }  // Function just returns the rpm as last read in this library
@@ -43,6 +44,7 @@ public:
     int32_t get_pitch(void) const { return _pitch_target; }  // Get pitch target
     float calc_speed_forward(void);  // Calculates the forward speed in the horizontal plane
     void set_dt(float delta_sec);
+	
 
     // User Settable Parameters
     static const struct AP_Param::GroupInfo var_info[];
@@ -50,7 +52,7 @@ public:
 	AP_Int16 _param_target_speed;
 	AP_Float _param_flr_alt;
 	AP_Float _param_tchdwn_alt;
-	AP_Float _param_sink_rate;
+	AP_Int16 _param_head_speed_set_point;
 
 private:
 
@@ -81,11 +83,14 @@ private:
     float _vel_p;                    // Forward velocity P term.
     float _vel_ff;                   // Forward velocity Feed Forward term.
     float _accel_out;                // Acceleration value used to calculate pitch target.
-	int    counter;
+	float   counter;
 	float sum_rpm;
 	float average_rpm;
 	float trim_speed;
 	float last_trim_speed;
+	float last_rpm;
+	float rpm_decay;
+	
 
     LowPassFilterFloat _accel_target_filter; // acceleration target filter
 
@@ -93,7 +98,6 @@ private:
     AP_Int8  _param_enable;
     AC_P _p_hs;
     AC_P _p_fw_vel;
-    AP_Int16 _param_head_speed_set_point;
     AP_Float _param_col_entry_cutoff_freq;
     AP_Float _param_col_glide_cutoff_freq;
     AP_Int16 _param_accel_max;

@@ -31,9 +31,9 @@ bool ModeAutorotate::init(bool ignore_checks)
         return false;
     }
 
+
     // Check that interlock is disengaged
     if (motors->get_interlock()) {
-        gcs().send_text(MAV_SEVERITY_INFO, "Autorot Mode Change Fail: Interlock Engaged");
         return false;
     }
 
@@ -85,6 +85,7 @@ void ModeAutorotate::run()
 
     // Current time
     now = millis(); //milliseconds
+	g2.arot.calculate_average_rpm();
 
     // Initialise internal variables
     float curr_vel_z = inertial_nav.get_velocity().z;   // Current vertical descent
@@ -95,19 +96,21 @@ void ModeAutorotate::run()
 
      // Setting default phase switch positions
      nav_pos_switch = Navigation_Decision::USER_CONTROL_STABILISED;
+	 
     if(inertial_nav.get_altitude() >=g2.arot._param_flr_alt) {
 		phase_switch = Autorotation_Phase::ENTRY;
 	 }
 	 if (inertial_nav.get_altitude() < g2.arot._param_flr_alt)  {
 		phase_switch = Autorotation_Phase::FLARE; 
-	} 
+	} 		
 	if (inertial_nav.get_altitude() < g2.arot._param_tchdwn_alt )  {
 		phase_switch = Autorotation_Phase::TOUCH_DOWN; 
-	} 
+	}
+	
     // Timer from entry phase to progress to glide phase
     if (phase_switch == Autorotation_Phase::ENTRY){
 
-       if ((now - _entry_time_start)/1000.0f > AUTOROTATE_ENTRY_TIME)  {
+       if ((now - _entry_time_start)/1000.0f > AUTOROTATE_ENTRY_TIME )  {
             // Flight phase can be progressed to steady state glide
             phase_switch = Autorotation_Phase::SS_GLIDE;
         }
@@ -136,7 +139,7 @@ void ModeAutorotate::run()
                 _target_head_speed = _initial_rpm/g2.arot.get_hs_set_point();
 
                 // Set desired forward speed target
-               // g2.arot.set_desired_fwd_speed();
+               g2.arot.set_desired_fwd_speed();
 
                 // Prevent running the initial entry functions again
                 _flags.entry_initial = 0;
@@ -144,24 +147,19 @@ void ModeAutorotate::run()
             }
          
             // Slowly change the target head speed until the target head speed matches the parameter defined value
-            if (g2.arot.get_rpm() > HEAD_SPEED_TARGET_RATIO*1.005f  ||  g2.arot.get_rpm() < HEAD_SPEED_TARGET_RATIO*0.995f) {
+            if (g2.arot.get_rpm() > g2.arot._param_head_speed_set_point*1.005f  || g2.arot.get_rpm() < g2.arot._param_head_speed_set_point*0.995f) {
                 _target_head_speed -= _hs_decay*G_Dt;
             } else {
                 _target_head_speed = HEAD_SPEED_TARGET_RATIO;
             }
-			
-			
-
+           
             // Set target head speed in head speed controller
             g2.arot.set_target_head_speed(_target_head_speed);
 
             // Run airspeed/attitude controller
             g2.arot.set_dt(G_Dt);
-           // g2.arot.update_forward_speed_controller();
 
-            // Retrieve pitch target
-           // _pitch_target = g2.arot.get_pitch();
-
+            g2.arot.update_forward_speed_controller();
             // Update controllers
             _flags.bad_rpm = g2.arot.update_hs_glide_controller(G_Dt); //run head speed/ collective controller
 
@@ -190,7 +188,7 @@ void ModeAutorotate::run()
                 // Prevent running the initial glide functions again
                 _flags.ss_glide_initial = 0;
             }
-
+            
             // Run airspeed/attitude controller
             g2.arot.set_dt(G_Dt);
             g2.arot.update_forward_speed_controller();
@@ -224,20 +222,16 @@ void ModeAutorotate::run()
                 // Prevent running the initial glide functions again
                 _flags.flare_initial = 0;
             }
-
+           
             // Run airspeed/attitude controller
             g2.arot.set_dt(G_Dt);
 		    Vector2f groundspeed_vector = ahrs.groundspeed_vector();
             float speed_forward = (groundspeed_vector.x*ahrs.cos_yaw() + groundspeed_vector.y*ahrs.sin_yaw())* 100; //(c/s)
             if(speed_forward >= g2.arot._param_flare_speed) {
 			_pitch_target = constrain_float( ((float)(speed_forward - g2.arot._param_flare_speed)/(float)(g2.arot._param_target_speed - g2.arot._param_flare_speed)*1500.0f),0.0f , 1500.0f );	
-			//_pitch_target = constrain_float( _pitch_target + (g2.arot._param_target_speed/g2.arot._param_flare_speed),0.0f , 1500.0f );
-         	//_pitch_target = linear_interpolate(0.0f , 10.0f ,inertial_nav.get_altitude() ,g.flare_alt ,g.touchdown_alt);
 			}else {
 			 _pitch_target = 0.0f;	
 			}
-            
-
             // Update head speed/ collective controller
             _flags.bad_rpm = g2.arot.update_hs_glide_controller(G_Dt); 
             // Attitude controller is updated in navigation switch-case statements
@@ -246,32 +240,34 @@ void ModeAutorotate::run()
         }
         case Autorotation_Phase::TOUCH_DOWN:
         {
-			if (_flags.touch_down_initial == 1) {
-
-                
-                    gcs().send_text(MAV_SEVERITY_INFO, "Touchdown_Phase");
-               
-			
-			  
-              pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+			if (_flags.touch_down_initial == 1) {                
+                    gcs().send_text(MAV_SEVERITY_INFO, "Touchdown_Phase");                           
                 // Prevent running the initial glide functions again
                 _flags.touch_down_initial = 0;	
+				
+				if (!pos_control->is_active_z()) {
+                    pos_control->relax_alt_hold_controllers(g2.arot.get_last_collective());
+                }
+						
+				 pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
             }
-		
-			 _pitch_target = 0.0f;	
-			 pos_control->set_alt_target_to_current_alt();
-			float _sink_target = linear_interpolate(0.0f , g.sink_rate, inertial_nav.get_altitude() , 0.0f ,g.touchdown_alt); 		
-			pos_control->set_desired_velocity_z((_sink_target)*-1.0f);
-            _target_climb_rate_adjust = (curr_vel_z - g2.arot._param_sink_rate)/(0.3f);
-            pos_control->set_max_accel_z(abs(_target_climb_rate_adjust));	
+		   
+			 _pitch_target = 0.0f;	   
+			pos_control->set_alt_target_with_slew(0.0f , G_Dt);
+		    float current_alt = inertial_nav.get_altitude();
+		    float current_sink_rate = inertial_nav.get_velocity_z();
+			 float _sink_target = linear_interpolate(0.0f , current_sink_rate, current_alt , 0.0f ,g2.arot._param_tchdwn_alt); 			 
+            pos_control->set_desired_velocity_z(_sink_target);
+			 
 			pos_control->update_z_controller();
 			
-			if(fabsf(inertial_nav.get_velocity_z()) < 50) {
+			if(fabsf(inertial_nav.get_velocity_z()) < 10) {
 				copter.ap.land_complete = true;
 			}	
 			
 			if (copter.ap.land_complete && motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE) {
             copter.arming.disarm();
+			pos_control->relax_alt_hold_controllers(0.5f);
             }
 			
             break;
