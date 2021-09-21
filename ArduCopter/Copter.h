@@ -84,6 +84,10 @@
  #define MOTOR_CLASS AP_MotorsMulticopter
 #endif
 
+#if GOVERNOR_ENABLED == ENABLED
+ #include <AC_Governor/AC_Governor.h> // governor controller
+#endif
+
 #if MODE_AUTOROTATE_ENABLED == ENABLED
  #include <AC_Autorotation/AC_Autorotation.h> // Autorotation controllers
 #endif
@@ -585,7 +589,7 @@ private:
         uint8_t inverted_flight         : 1;    // 1   // true for inverted flight mode
         uint8_t in_autorotation         : 1;    // 2   // true when heli is in autorotation
 		uint8_t start_engine             :1;    //3  //true for turbine start condition
-		uint8_t governor             :1;    //4  //true for governor enabled
+		uint8_t governor             :1;    //4  //true for governo on
     } heli_flags_t;
     heli_flags_t heli_flags;
 
@@ -761,8 +765,13 @@ private:
     float get_pilot_desired_rotor_speed() const;
     void heli_update_rotor_speed_targets();
     void heli_update_autorotation();
+	void heli_update_governor();
 #if MODE_AUTOROTATE_ENABLED == ENABLED
     void heli_set_autorotation(bool autotrotation);
+#endif
+#if GOVERNOR_ENABLED == ENABLED
+    void heli_set_governor(bool governor);
+	AC_Governor& get_gov(){ return g2.gov; }
 #endif
     // inertia.cpp
     void read_inertia();

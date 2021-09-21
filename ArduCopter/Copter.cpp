@@ -250,6 +250,9 @@ void Copter::fast_loop()
 
 #if FRAME_CONFIG == HELI_FRAME
     update_heli_control_dynamics();
+	#if GOVERNOR_ENABLED == ENABLED
+        heli_update_governor();
+    #endif
     #if MODE_AUTOROTATE_ENABLED == ENABLED
         heli_update_autorotation();
     #endif

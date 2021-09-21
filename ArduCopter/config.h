@@ -67,8 +67,14 @@
   # define THR_MIN_DEFAULT                      0
   # define AUTOTUNE_ENABLED                     DISABLED
   # define ACCEL_Z_P                            0.30f
-#endif
+ #endif
 
+/////////////////////////////////////////////////////////////////////////////////
+// Governor defaults
+#ifndef GOVERNOR_ENABLED
+   # define GOVERNOR_ENABLED !HAL_MINIMIZE_FEATURES
+ #endif
+		
 //////////////////////////////////////////////////////////////////////////////
 // PWM control
 // default RC speed in Hz

@@ -63,7 +63,6 @@ public:
     //
     void set_turb_start(bool turb_start) { _heliflags.start_engine = turb_start; }
 	
-	 void set_gov_on(bool gov_on) { _heliflags.governor = gov_on; }
     // parameter_check - returns true if helicopter specific parameters are sensible, used for pre-arm check
     virtual bool parameter_check(bool display_msg) const;
 
@@ -81,12 +80,12 @@ public:
 
     // get_rsc_setpoint - gets contents of _rsc_setpoint parameter (0~1)
     float get_rsc_setpoint() const { return _main_rotor._rsc_setpoint.get() * 0.01f; }
-    
-    // set_rpm - for rotor speed governor
-    virtual void set_rpm(float rotor_rpm) = 0;
 
     // set_desired_rotor_speed - sets target rotor speed as a number from 0 ~ 1
     virtual void set_desired_rotor_speed(float desired_speed) = 0;
+	
+	//set governor output
+    virtual void set_governor_output(float gov_output) = 0;
 
     // get_desired_rotor_speed - gets target rotor speed as a number from 0 ~ 1
     virtual float get_desired_rotor_speed() const = 0;
@@ -206,7 +205,6 @@ protected:
         uint8_t enable_bailout          : 1;    // true if allowing RSC to quickly ramp up engine
         uint8_t servo_test_running      : 1;    // true if servo_test is running
 		uint8_t start_engine                  : 1;
-		uint8_t governor                  : 1;
     } _heliflags;
 
     // parameters
